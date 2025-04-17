@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: image-captioning # Or your default namespace
+spec:
+  selector:
+    app: image-caption-backend # Matches labels in the Deployment
+  ports:
+  - protocol: TCP
+    port: 80 # Service port (internal cluster access)
+    targetPort: 8000 # Port on the pod/container
+  type: ClusterIP # Only reachable within the cluster

@@ -1,0 +1,35 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: image-caption-ingress
+  namespace: image-captioning # Or your default namespace
+  annotations:
+    # --- Common annotations (adjust for your Ingress controller) ---
+    # nginx.ingress.kubernetes.io/rewrite-target: /$2 # Example for path rewriting if needed
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m" # Allow larger image uploads
+    # --- TLS/HTTPS (Requires cert-manager or manual secret) ---
+    # kubernetes.io/ingress.class: "nginx" # Specify ingress class
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod" # Example for cert-manager
+spec:
+  # tls: # Uncomment and configure for HTTPS
+  # - hosts:
+  #   - your-domain.com # <-- CHANGE THIS
+  #   secretName: your-tls-secret # Managed by cert-manager or created manually
+  rules:
+  - host: your-domain.com # <-- CHANGE THIS (or omit for default host)
+    http:
+      paths:
+      - path: /api # Route API calls to backend
+        pathType: Prefix
+        backend:
+          service:
+            name: backend-service
+            port:
+              number: 80
+      - path: / # Route everything else to frontend
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-service
+            port:
+              number: 80

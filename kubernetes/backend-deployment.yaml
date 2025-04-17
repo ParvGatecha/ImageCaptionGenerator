@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-deployment
+  namespace: image-captioning # Or your default namespace
+  labels:
+    app: image-caption-backend
+spec:
+  replicas: 1 # Start with 1, HPA will manage scaling
+  selector:
+    matchLabels:
+      app: image-caption-backend
+  template:
+    metadata:
+      labels:
+        app: image-caption-backend
+    spec:
+      # If using private registry, add imagePullSecrets:
+      # imagePullSecrets:
+      # - name: your-registry-secret
+      containers:
+      - name: backend
+        image: your-docker-registry/image-caption-backend:latest # <-- CHANGE THIS
+        ports:
+        - containerPort: 8000
+        # --- Resource Requests & Limits (CRUCIAL for HPA and scheduling) ---
+        resources:
+          requests:
+            memory: "2Gi"  # Adjust based on model size
+            cpu: "500m"    # 0.5 CPU core
+            # If using GPU:
+            # nvidia.com/gpu: 1 # Request 1 GPU
+          limits:
+            memory: "4Gi"  # Adjust based on model size and load
+            cpu: "1000m"   # 1 CPU core
+            # If using GPU:
+            # nvidia.com/gpu: 1 # Limit to 1 GPU
+        # --- Health Checks ---
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 60 # Give time for model to load
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 65 # Slightly after liveness
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 2
+        # --- Environment Variables (Optional) ---
+        # env:
+        # - name: TRANSFORMERS_CACHE
+        #   value: "/cache/huggingface" # Example if using shared volume
+        # --- Volume Mounts (Optional, e.g., for shared model cache) ---
+        # volumeMounts:
+        # - name: model-cache-volume
+        #   mountPath: "/cache/huggingface"
+      # --- Volumes (Optional) ---
+      # volumes:
+      # - name: model-cache-volume
+      #   persistentVolumeClaim:
+      #     claimName: model-cache-pvc # Requires a PVC to be created

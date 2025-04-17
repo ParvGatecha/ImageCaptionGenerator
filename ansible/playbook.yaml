@@ -1,0 +1,41 @@
+---
+- name: Configure Kubernetes Nodes or Deploy Agents
+  hosts: kubernetes_nodes # Assumes an inventory group named 'kubernetes_nodes'
+  become: yes # Run tasks with sudo
+
+  tasks:
+    - name: Ensure prerequisites are installed (Example: Docker)
+      apt: # Or 'yum' for CentOS/RHEL
+        name: docker.io
+        state: present
+        update_cache: yes
+      tags: [prereqs]
+
+    - name: Ensure Filebeat is installed (Example for ELK)
+      apt:
+        name: filebeat
+        state: present
+      tags: [monitoring, filebeat]
+
+    - name: Copy Filebeat configuration
+      template: # Use template to inject variables if needed
+        src: ../elk/filebeat.yml.j2 # Jinja2 template file
+        dest: /etc/filebeat/filebeat.yml
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart Filebeat # Handler defined below
+      tags: [monitoring, filebeat]
+
+    - name: Ensure Filebeat service is enabled and running
+      service:
+        name: filebeat
+        state: started
+        enabled: yes
+      tags: [monitoring, filebeat]
+
+  handlers:
+    - name: Restart Filebeat
+      service:
+        name: filebeat
+        state: restarted
