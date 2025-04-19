@@ -20,7 +20,7 @@ spec:
       # - name: your-registry-secret
       containers:
       - name: backend
-        image: your-docker-registry/image-caption-backend:latest # <-- CHANGE THIS
+        image: parvg/image-caption-backend:latest # <-- CHANGE THIS
         ports:
         - containerPort: 8000
         # --- Resource Requests & Limits (CRUCIAL for HPA and scheduling) ---

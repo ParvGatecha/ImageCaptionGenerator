@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+python-multipart # For file uploads
+Pillow # For image handling
+transformers[torch] # Or [tf] if using TensorFlow
+torch # Or tensorflow
+accelerate # Often needed by transformers
+requests # For potential internal communication or testing
+pytest # For tests
