@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 # --- Configuration ---
 # Choose a YOLOv8 model checkpoint (e.g., yolov8n.pt, yolov8s.pt, yolov8m.pt)
 # 'n' is nano (fastest, lowest accuracy), 's' is small, 'm' is medium etc.
-MODEL_NAME = "yolov8m.pt" # Using the nano version as a starting point
+MODEL_NAME = "yolo11m.pt" # Using the nano version as a starting point
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu" # ultralytics can often auto-detect, but good to specify
 CONFIDENCE_THRESHOLD = 0.40 # Adjust confidence threshold as needed for YOLOv8
 
@@ -29,15 +29,15 @@ def load_model():
         logger.info("YOLOv8 model already loaded.")
         return
     try:
-        logger.info(f"Loading YOLOv8 model '{MODEL_NAME}' onto device '{DEVICE}'...")
+        logger.info(f"Loading YOLOv11 model '{MODEL_NAME}' onto device '{DEVICE}'...")
         # Initialize YOLO model
         model = YOLO(MODEL_NAME)
         # You can explicitly move the model to a device if needed,
         # but YOLO often handles device placement automatically during predict.
         # model.to(DEVICE) # Usually not required unless specific device needed upfront
-        logger.info(f"YOLOv8 model '{MODEL_NAME}' loaded successfully.")
+        logger.info(f"YOLOv11 model '{MODEL_NAME}' loaded successfully.")
     except Exception as e:
-        logger.error(f"Error loading YOLOv8 model: {e}", exc_info=True)
+        logger.error(f"Error loading YOLOv11 model: {e}", exc_info=True)
         model = None # Reset on failure
         raise RuntimeError(f"Failed to load ML model: {e}")
 
@@ -47,7 +47,7 @@ def detect_objects(image_bytes: bytes) -> list:
     global model
 
     if not model:
-        raise RuntimeError("YOLOv8 model is not loaded.")
+        raise RuntimeError("YOLOv11 model is not loaded.")
 
     detections = []
     try:
@@ -63,7 +63,7 @@ def detect_objects(image_bytes: bytes) -> list:
         # No need to convert RGB -> BGR, ultralytics handles it
         # img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR) # Not needed for ultralytics>=8
 
-        logger.debug("Performing YOLOv8 object detection inference...")
+        logger.debug("Performing YOLOv11 object detection inference...")
 
         # Perform prediction
         # Pass image directly, specify confidence, device, and disable verbose logs
@@ -74,13 +74,13 @@ def detect_objects(image_bytes: bytes) -> list:
 
         # Check if results is a list and has items
         if not results or len(results) == 0:
-             logger.info("YOLOv8 prediction returned no results.")
+             logger.info("YOLOv11 prediction returned no results.")
              return []
 
         # Process results - results is a list, usually with one element for single image
         result = results[0] # Get the results for the first (and only) image
         boxes = result.boxes # Access the Boxes object containing detections
-        logger.info(f"Raw YOLOv8 prediction results: {len(boxes)} potential boxes found before filtering.")
+        logger.info(f"Raw YOLOv11 prediction results: {len(boxes)} potential boxes found before filtering.")
         if len(boxes) > 0:
             raw_scores = boxes.conf.cpu().numpy().tolist()
             logger.info(f"Raw Scores (before threshold): {raw_scores}")
