@@ -1,0 +1,33 @@
+# grafana-ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana-ingress
+  namespace: monitoring # Deploy Ingress in the same namespace as Grafana service
+  annotations:
+    # Annotation for NGINX Ingress Controller to strip the path prefix
+    nginx.ingress.kubernetes.io/rewrite-target: /$2 # Capture group 2 from path regex
+
+    # Optional: Increase timeouts if Grafana dashboards take time to load
+    # nginx.ingress.kubernetes.io/proxy-connect-timeout: "15s"
+    # nginx.ingress.kubernetes.io/proxy-read-timeout: "60s"
+    # nginx.ingress.kubernetes.io/proxy-send-timeout: "60s"
+spec:
+  ingressClassName: nginx # Assumes you use the standard NGINX Ingress class
+  rules:
+  - host: ai-tools # Use the same host as your main application
+    http:
+      paths:
+      - path: /grafana(/|$)(.*) # Match /grafana, /grafana/ or /grafana/something
+                                # $1 captures '/' or end-of-string
+                                # $2 captures 'something' (the part to keep)
+        pathType: ImplementationSpecific # Required when using regex in path
+        backend:
+          service:
+            # Service name created by the kube-prometheus-stack chart
+            # Verify with: kubectl get svc -n monitoring -l app.kubernetes.io/name=grafana
+            name: prometheus-grafana
+            port:
+              # Port name/number exposed by the Grafana Service (usually 80 or 3000 for http)
+              # Verify with: kubectl describe svc prometheus-grafana -n monitoring
+              number: 80 # Assuming the service exposes port 80

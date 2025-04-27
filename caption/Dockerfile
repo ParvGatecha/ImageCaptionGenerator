@@ -1,9 +1,9 @@
 # Use an official Python runtime as a parent image
-FROM alpine:3.13-slim
+FROM python:3.13-slim
 
 # Set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 # Set Hugging Face cache directory (optional, useful in K8s with shared volumes)
 ENV TRANSFORMERS_CACHE=/app/.cache/huggingface
 # Newer versions use HF_HOME
@@ -14,6 +14,9 @@ WORKDIR /app
 
 # Install system dependencies (if any are needed, e.g., for OpenCV)
 # RUN apt-get update && apt-get install -y --no-install-recommends some-package && rm -rf /var/lib/apt/lists/*
+# RUN apt-get update && \
+#     apt-get install -y build-essential && \
+#     apt-get clean
 
 # Install Python dependencies
 # Copy only requirements first to leverage Docker cache

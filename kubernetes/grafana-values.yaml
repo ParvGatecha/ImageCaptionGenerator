@@ -1,0 +1,6 @@
+# grafana-values.yaml
+grafana:
+  # Tell Grafana its public root URL via environment variable
+  # *** IMPORTANT: Include the trailing slash! ***
+  env:
+    GF_SERVER_ROOT_URL: http://ai-tools/grafana/

@@ -1,0 +1,74 @@
+version: '3.8' # Use a recent version
+
+services:
+  # --- Caption Backend Service ---
+  caption:
+    build: ./caption # Directory containing the caption Dockerfile
+    image: parvg/caption:latest
+    container_name: caption-service
+    ports:
+      # Expose caption service on host port 8001, mapping to container port 8000
+      - "8001:8001"
+    restart: unless-stopped
+    networks:
+      - ai_tools_network
+    # Optional: Add volumes for model caching if needed
+    # volumes:
+    #   - caption_model_cache:/root/.cache/huggingface # Example cache path
+    # Optional: Add environment variables if your caption app needs them
+    # environment:
+    #   - MODEL_PATH=/models
+
+  # --- Object Detection Backend Service ---
+  object:
+    build: ./object # Directory containing the object Dockerfile
+    image: parvg/object:latest
+    container_name: object-service
+    ports:
+      # Expose object service on host port 8003, mapping to container port 8002
+      - "8001:8001"
+    restart: unless-stopped
+    networks:
+      - ai_tools_network
+    # Optional: Add volumes for model caching if needed
+    # volumes:
+    #   - object_model_cache:/root/.cache/huggingface # Example cache path
+    # Optional: Add environment variables if your object app needs them
+    # environment:
+    #   - DETECTION_THRESHOLD=0.6
+
+  # --- Frontend Service ---
+  frontend:
+    build: ./frontend # Directory containing the frontend Dockerfile
+    image: parvg/spefrontend:latest
+    container_name: frontend-service
+    ports:
+      # Expose frontend on host port 8080, mapping to container port 80
+      - "80:80"
+    restart: unless-stopped
+    networks:
+      - ai_tools_network
+    depends_on:
+      # Start backends before frontend (doesn't guarantee readiness, just start order)
+      - caption
+      - object
+    # --- IMPORTANT: Environment variables for Frontend ---
+    # Pass the internal URLs of the backend services to the frontend container
+    # Your React/Vue/etc app needs to be configured to read these env vars
+    # (e.g., process.env.REACT_APP_CAPTION_API_URL)
+    environment:
+      # The frontend JS will call http://caption:8000/api/...
+      - REACT_APP_CAPTION_API_URL=http://ai-tools/api
+      # The frontend JS will call http://object:8002/api/detect...
+      - REACT_APP_OBJECT_API_URL=http://ai-tools/api/
+      # Add other env vars the frontend needs, like NODE_ENV=production if applicable
+
+# --- Define Network ---
+networks:
+  ai_tools_network:
+    driver: bridge # Default Docker network driver
+
+# --- Optional: Define Named Volumes for Persistent Cache ---
+# volumes:
+#   caption_model_cache:
+#   object_model_cache:

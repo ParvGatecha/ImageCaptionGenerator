@@ -1,0 +1,37 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: caption-backend-monitor # Unique name for this monitor
+  namespace: spe-project # MUST be the same namespace as the Service
+  labels:
+    release: prometheus # MUST match the label Prometheus uses to find monitors (default for the chart)
+spec:
+  selector:
+    matchLabels:
+      app: image-caption-backend # Selects the backend-service via its label
+  namespaceSelector: # Optional, but good practice
+    matchNames:
+      - spe-project
+  endpoints:
+  - port: http-caption # Matches the NAME of the port in backend-service
+    path: /metrics     # Path where metrics are exposed by your app
+    interval: 30s      # How often to scrape
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: object-detector-monitor # Unique name for this monitor
+  namespace: spe-project # MUST be the same namespace as the Service
+  labels:
+    release: prometheus # MUST match the label Prometheus uses to find monitors
+spec:
+  selector:
+    matchLabels:
+      app: object-detector-backend # Selects the object-detector-service via its label
+  namespaceSelector:
+    matchNames:
+      - spe-project
+  endpoints:
+  - port: http-object # Matches the NAME of the port in object-detector-service
+    path: /metrics    # Path where metrics are exposed by your app
+    interval: 30s

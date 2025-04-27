@@ -6,3 +6,7 @@ python-multipart>=0.0.5
 # accelerate>=0.12.0 # Likely not needed for ultralytics
 ultralytics>=8.0.0  # Add ultralytics
 opencv-python-headless>=4.5.0 # Add opencv
+# requirements.txt for caption and object backends
+prometheus-client
+# For FastAPI auto-instrumentation (RECOMMENDED):
+prometheus-fastapi-instrumentator

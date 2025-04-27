@@ -2,9 +2,9 @@
 
 // Base URLs for the different services
 const CAPTION_API_BASE_URL =
-  process.env.REACT_APP_CAPTION_API_URL || "http://localhost:8000";
+  process.env.REACT_APP_CAPTION_API_URL || "http://ai-tools/api";
 const DETECTION_API_BASE_URL =
-  process.env.REACT_APP_DETECTION_API_URL || "http://localhost:8001";
+  process.env.REACT_APP_DETECTION_API_URL || "http://ai-tools/api";
 
 // Helper function to handle common fetch logic and errors
 const fetchApi = async (url, options, file) => {
@@ -61,7 +61,7 @@ export const uploadImageAndGetCaption = async (file) => {
 
 // --- Object Detection API ---
 export const uploadImageAndDetectObjects = async (file) => {
-  const data = await fetchApi(`${DETECTION_API_BASE_URL}/detect`, {}, file);
+  const data = await fetchApi(`${DETECTION_API_BASE_URL}/object`, {}, file);
   console.log("Raw API Response:", data); // <-- Add this log
   if (data.error) {
     throw new Error(data.error);

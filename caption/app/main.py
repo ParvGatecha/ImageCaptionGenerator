@@ -2,6 +2,7 @@ import logging
 from fastapi import FastAPI, File, UploadFile, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from . import model_loader, schemas # Use relative imports within the package
 
@@ -26,13 +27,19 @@ async def lifespan(app: FastAPI):
     logger.info("Application shutdown: Cleaning up resources...")
     # Add any cleanup logic here if needed (e.g., releasing GPU memory explicitly)
 
-# --- FastAPI App Initialization ---
+API_PREFIX = "/api"
+
 app = FastAPI(
-    title="Image Captioning API",
-    description="API to generate captions for uploaded images.",
-    version="0.1.0",
-    lifespan=lifespan # Use the lifespan context manager
+    title="Image Caption Generator API",
+    description="API to generate captions for images.",
+    # version="1.0.0",
+    # # --- ADD THESE TWO ARGUMENTS ---
+    openapi_url=f"{API_PREFIX}/openapi.json", # Tells FastAPI where the schema is publicly available
+    openapi_prefix=API_PREFIX,
+    lifespan=lifespan               # Tells FastAPI to prefix paths *within* the schema
 )
+
+Instrumentator().instrument(app).expose(app)
 
 app.add_middleware(
     CORSMiddleware,

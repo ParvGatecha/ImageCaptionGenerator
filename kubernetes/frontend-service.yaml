@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: frontend-service
-  namespace: image-captioning # Or your default namespace
+  namespace: spe-project # Or your default namespace
 spec:
   selector:
     app: image-caption-frontend

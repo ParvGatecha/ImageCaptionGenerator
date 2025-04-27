@@ -2,31 +2,48 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: image-caption-ingress
-  namespace: image-captioning # Or your default namespace
+  namespace: spe-project
   annotations:
-    # --- Common annotations (adjust for your Ingress controller) ---
-    # nginx.ingress.kubernetes.io/rewrite-target: /$2 # Example for path rewriting if needed
-    nginx.ingress.kubernetes.io/proxy-body-size: "50m" # Allow larger image uploads
-    # --- TLS/HTTPS (Requires cert-manager or manual secret) ---
-    # kubernetes.io/ingress.class: "nginx" # Specify ingress class
-    # cert-manager.io/cluster-issuer: "letsencrypt-prod" # Example for cert-manager
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    # NO global rewrite annotation
+    # NO snippets
 spec:
-  # tls: # Uncomment and configure for HTTPS
-  # - hosts:
-  #   - your-domain.com # <-- CHANGE THIS
-  #   secretName: your-tls-secret # Managed by cert-manager or created manually
+  ingressClassName: nginx
   rules:
-  - host: your-domain.com # <-- CHANGE THIS (or omit for default host)
+  - host: ai-tools
     http:
       paths:
-      - path: /api # Route API calls to backend
+      # --- Backend Captioning API Rule ---
+      # Assuming backend code handles /api/caption
+      - path: /api/caption # Be specific if possible
         pathType: Prefix
         backend:
           service:
-            name: backend-service
+            name: backend-service # Original captioning service
             port:
               number: 80
-      - path: / # Route everything else to frontend
+
+      # --- NEW: Backend Object Detection API Rule ---
+      # Assuming object detector code handles /api/object/...
+      - path: /api/object # Requests starting with this prefix...
+        pathType: Prefix
+        backend:
+          service:
+            name: object-detector-service # ...go to the NEW service
+            port:
+              number: 80 # Port defined in object-detector-service
+
+      # --- Static Assets Rule ---
+      - path: /static
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-service
+            port:
+              number: 80
+
+      # --- Frontend Root Rule ---
+      - path: /
         pathType: Prefix
         backend:
           service:

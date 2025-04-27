@@ -1,6 +1,6 @@
 # ---- Build Stage ----
 # Use an official Node runtime as the build environment
-FROM node:23-alpine-slim as builder
+FROM node:20-slim AS builder
 
 # Set the working directory
 WORKDIR /app
@@ -17,6 +17,7 @@ COPY . .
 
 # Build the React application for production
 RUN npm run build
+RUN ls -lA /app/build
 
 # ---- Run Stage ----
 # Use a lightweight Nginx image to serve the static files

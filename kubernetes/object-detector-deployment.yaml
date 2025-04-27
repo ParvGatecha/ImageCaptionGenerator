@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: object-detector-deployment # New unique name
+  namespace: spe-project
+  labels:
+    app: object-detector-backend # New unique label for these pods
+spec:
+  replicas: 1 # Start with 1, adjust as needed
+  selector:
+    matchLabels:
+      app: object-detector-backend # Selector must match pod labels below
+  template:
+    metadata:
+      labels:
+        app: object-detector-backend # Pods get this label
+    spec:
+      # imagePullSecrets: # If needed for parvg/object
+      # - name: your-registry-secret
+      containers:
+      - name: object-detector # Container name
+        image: parvg/object:latest # Your object detection image
+        ports:
+        - containerPort: 8001 # *** IMPORTANT: Assume this is the port parvg/object listens on. CHANGE IF DIFFERENT ***
+        resources: # Adjust resources based on the object detector's needs
+          requests:
+            memory: "1.5Gi" # Example
+            cpu: "500m"
+            # nvidia.com/gpu: 1 # If needed
+          limits:
+            memory: "3Gi" # Example
+            cpu: "1000m"
+            # nvidia.com/gpu: 1
+        # --- Health Checks for Object Detector ---
+        # livenessProbe: # RECOMMENDED
+        #   httpGet:
+        #     path: /health # *** IMPORTANT: Assume this health path exists. CHANGE IF DIFFERENT ***
+        #     port: 8002   # *** IMPORTANT: Port for object detector health check ***
+        #   initialDelaySeconds: 75 # Adjust timing as needed for model load
+        #   periodSeconds: 20
+        #   timeoutSeconds: 10
+        #   failureThreshold: 3
+        # readinessProbe: # RECOMMENDED
+        #   httpGet:
+        #     path: /health # *** IMPORTANT: Assume this health path exists. CHANGE IF DIFFERENT ***
+        #     port: 8002   # *** IMPORTANT: Port for object detector health check ***
+        #   initialDelaySeconds: 85 # Adjust timing
+        #   periodSeconds: 15
+        #   timeoutSeconds: 10
+        #   successThreshold: 1
+        #   failureThreshold: 3
+        # --- Environment Variables for Object Detector (if needed) ---
+        # env:
+        # - name: OBJECT_ENV_VAR
+        #   value: "some_value"
+        # --- Volume Mounts for Object Detector (if needed) ---
+        # volumeMounts:
+        # - name: object-model-cache # Example
+        #   mountPath: "/models"
+      # --- Volumes Section (Define any volumes needed) ---
+      # volumes:
+      # - name: object-model-cache
+      #   persistentVolumeClaim:
+      #     claimName: object-cache-pvc # Requires a PVC

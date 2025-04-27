@@ -7,3 +7,7 @@ torch # Or tensorflow
 accelerate # Often needed by transformers
 requests # For potential internal communication or testing
 pytest # For tests
+# requirements.txt for caption and object backends
+prometheus-client
+# For FastAPI auto-instrumentation (RECOMMENDED):
+prometheus-fastapi-instrumentator

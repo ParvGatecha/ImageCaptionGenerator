@@ -2,6 +2,7 @@ import logging
 from fastapi import FastAPI, File, UploadFile, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from . import model_loader, schemas # Use relative imports within the package
 
@@ -33,6 +34,8 @@ app = FastAPI(
     lifespan=lifespan # Use the lifespan context manager
 )
 
+Instrumentator().instrument(app).expose(app)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], # Allows all origins
@@ -42,7 +45,7 @@ app.add_middleware(
 )
 
 # --- API Endpoints ---
-@app.get("/health", response_model=schemas.HealthCheckResponse, tags=["Health"])
+@app.get("/api/health", response_model=schemas.HealthCheckResponse, tags=["Health"])
 async def health_check():
     """Performs a basic health check, including model status."""
     # Check only for the model, as image_processor is removed
@@ -51,7 +54,7 @@ async def health_check():
     logger.info(f"Health check requested. Model status: {status_msg}")
     return schemas.HealthCheckResponse(status=status_msg)
 
-@app.post("/detect", response_model=schemas.ObjectDetectionResponse, tags=["Detection"])
+@app.post("/api/object", response_model=schemas.ObjectDetectionResponse, tags=["Detection"])
 async def detect_objects_endpoint(file: UploadFile = File(...)):
     """
     Uploads an image file and returns detected objects with bounding boxes.

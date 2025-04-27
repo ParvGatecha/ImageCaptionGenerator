@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: frontend-deployment
-  namespace: image-captioning # Or your default namespace
+  namespace: spe-project # Or your default namespace
   labels:
     app: image-caption-frontend
 spec:
@@ -19,7 +19,7 @@ spec:
       # - name: your-registry-secret
       containers:
       - name: frontend
-        image: your-docker-registry/image-caption-frontend:latest # <-- CHANGE THIS
+        image: parvg/spefrontend:latest # <-- CHANGE THIS
         ports:
         - containerPort: 80
         resources: # Frontend usually needs fewer resources
