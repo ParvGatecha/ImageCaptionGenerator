@@ -2,11 +2,11 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: backend-deployment
-  namespace: spe-project # Or your default namespace
+  namespace: spe-project # Ensure this namespace exists
   labels:
     app: image-caption-backend
 spec:
-  replicas: 1 # Start with 1, HPA will manage scaling
+  replicas: 1 # HPA can manage this later
   selector:
     matchLabels:
       app: image-caption-backend
@@ -15,54 +15,164 @@ spec:
       labels:
         app: image-caption-backend
     spec:
-      # If using private registry, add imagePullSecrets:
-      # imagePullSecrets:
-      # - name: your-registry-secret
+      # --- Define Volume from PVC ---
+      volumes:
+      - name: shared-model-cache-volume # Define a volume name
+        persistentVolumeClaim:
+          claimName: shared-model-cache-pvc # Reference your PVC (Ensure this PVC exists)
+
+      # --- Init Container to Download Caption Model (Optimized) ---
+      initContainers:
+      - name: init-caption-model-download
+        image: python:3.13-slim # Base image with python/pip
+        env:
+          - name: HF_HOME
+            value: /model-cache/.cache/huggingface
+          - name: TRANSFORMERS_CACHE
+            value: /model-cache/.cache/huggingface
+        volumeMounts:
+        - name: shared-model-cache-volume # Mount the shared volume
+          mountPath: /model-cache
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            echo "Checking for caption model marker..."
+            MARKER_FILE="/model-cache/caption_model_downloaded.marker"
+            MODEL_NAME_SHELL="nlpconnect/vit-gpt2-image-captioning"
+
+            # --- Check for the marker file FIRST ---
+            if [ ! -f "$MARKER_FILE" ]; then
+              echo "Marker file not found. Proceeding with dependency installation and model download..."
+
+              # --- Install System Dependencies ONLY if needed ---
+              echo "Installing system dependencies..."
+              apt-get update && \
+              apt-get install -y --no-install-recommends build-essential cmake pkg-config && \
+              rm -rf /var/lib/apt/lists/*
+              # Check exit code for apt-get
+              if [ $? -ne 0 ]; then
+                echo "ERROR: System dependency installation failed."
+                exit 1
+              fi
+              echo "System dependencies installed."
+              # --- End System Dependency Installation ---
+
+              # --- Install Python Libraries ONLY if needed ---
+              echo "Installing python libraries..."
+              # Added --root-user-action=ignore to suppress the warning, use with caution or setup a venv if possible
+              pip install --no-cache-dir --root-user-action=ignore transformers torch huggingface_hub sentencepiece pillow
+              # Check exit code for pip install
+              if [ $? -ne 0 ]; then
+                echo "ERROR: Python library installation failed."
+                exit 1
+              fi
+              echo "Python libraries installed."
+              # --- End Python Library Installation ---
+
+              # --- Download Model ONLY if needed ---
+              echo "Attempting caption model download..."
+              # Note: Using the shell variable $MODEL_NAME_SHELL inside the Python string
+              python -c "
+            import sys
+            import os
+            from transformers import VisionEncoderDecoderModel, ViTImageProcessor, AutoTokenizer
+            # Define model name and cache directory using environment variable or direct string
+            MODEL_NAME_PYTHON = os.getenv('MODEL_NAME_ENV', '$MODEL_NAME_SHELL') # Example using env var or fallback to shell var
+            CACHE_DIR = '/model-cache/.cache/huggingface'
+            
+            print(f'Downloading {MODEL_NAME_PYTHON} components to {CACHE_DIR}...')
+            try:
+            # Ensure cache directory exists (optional, Hugging Face usually creates it)
+              os.makedirs(CACHE_DIR, exist_ok=True)
+              # Explicitly pass cache_dir and force_download=False (default, but good practice)
+              # Consider adding local_files_only=False if issues persist with finding cached files
+              VisionEncoderDecoderModel.from_pretrained(MODEL_NAME_PYTHON, cache_dir=CACHE_DIR)
+              ViTImageProcessor.from_pretrained(MODEL_NAME_PYTHON, cache_dir=CACHE_DIR)
+              AutoTokenizer.from_pretrained(MODEL_NAME_PYTHON, cache_dir=CACHE_DIR)
+              print('Caption model download/verification attempt finished successfully.')
+              # Exit with 0 on success
+              sys.exit(0)
+            except Exception as e:
+              print(f'ERROR during model download: {e}')
+              # Exit with non-zero code on failure
+              sys.exit(1)
+            "
+              # Check the exit code of the python command
+              PYTHON_EXIT_CODE=$?
+              if [ $PYTHON_EXIT_CODE -eq 0 ]; then
+                echo "Python script succeeded, creating marker file..."
+                # Create marker file ONLY on full success
+                touch "$MARKER_FILE"
+              else
+                echo "Python script failed with exit code $PYTHON_EXIT_CODE. Not creating marker file."
+                # Exit the init container with an error
+                exit 1
+              fi
+              # --- End Model Download ---
+
+            else
+              # --- Marker file EXISTS ---
+              echo "Caption model marker file found. Skipping dependency installation and model download."
+              echo "Assuming dependencies and model are present in the volume: /model-cache"
+            fi
+
+            # If we reached here, either the marker existed or everything succeeded.
+            echo "Init container finished successfully."
+            exit 0 # Explicitly exit successfully
+
+      # --- Main Application Container ---
       containers:
       - name: backend
-        image: parvg/caption:latest # <-- CHANGE THIS
+        image: parvg/caption:latest # Your captioning image
         ports:
-        - containerPort: 8000
-        # --- Resource Requests & Limits (CRUCIAL for HPA and scheduling) ---
+        - name: http-caption # Named port for ServiceMonitor
+          containerPort: 8000
+        env: # Set cache env vars for the main application
+          - name: HF_HOME
+            value: /model-cache/.cache/huggingface
+          - name: TRANSFORMERS_CACHE # Still useful for some older versions/tools
+            value: /model-cache/.cache/huggingface
+          # Add any other necessary environment variables for your app
+          # Example:
+          # - name: LOG_LEVEL
+          #   value: "info"
+        volumeMounts: # Mount the volume into the main container
+        - name: shared-model-cache-volume
+          mountPath: /model-cache # Mount the *entire* volume here
         resources:
           requests:
-            memory: "2Gi"  # Adjust based on model size
-            cpu: "500m"    # 0.5 CPU core
-            # If using GPU:
-            # nvidia.com/gpu: 1 # Request 1 GPU
+            memory: "2Gi"
+            cpu: "500m"
+            # nvidia.com/gpu: "1" # Uncomment if using GPUs
           limits:
-            memory: "4Gi"  # Adjust based on model size and load
-            cpu: "1000m"   # 1 CPU core
-            # If using GPU:
-            # nvidia.com/gpu: 1 # Limit to 1 GPU
-        # --- Health Checks ---
-        # livenessProbe:
-        #   httpGet:
-        #     path: /health
-        #     port: 8000
-        #   initialDelaySeconds: 60 # Give time for model to load
-        #   periodSeconds: 15
-        #   timeoutSeconds: 5
-        #   failureThreshold: 3
-        # readinessProbe:
-        #   httpGet:
-        #     path: /health
-        #     port: 8000
-        #   initialDelaySeconds: 65 # Slightly after liveness
-        #   periodSeconds: 10
-        #   timeoutSeconds: 5
-        #   successThreshold: 1
-        #   failureThreshold: 2
-        # --- Environment Variables (Optional) ---
-        # env:
-        # - name: TRANSFORMERS_CACHE
-        #   value: "/cache/huggingface" # Example if using shared volume
-        # --- Volume Mounts (Optional, e.g., for shared model cache) ---
-        # volumeMounts:
-        # - name: model-cache-volume
-        #   mountPath: "/cache/huggingface"
-      # --- Volumes (Optional) ---
-      # volumes:
-      # - name: model-cache-volume
-      #   persistentVolumeClaim:
-      #     claimName: model-cache-pvc # Requires a PVC to be created
+            memory: "4Gi"
+            cpu: "1000m" # Adjust based on load testing
+            # nvidia.com/gpu: "1" # Uncomment if using GPUs
+        # --- RECOMMENDED: Configure Health Checks ---
+      #   livenessProbe:
+      #     httpGet:
+      #       path: /api/health # CHANGE to your actual health check endpoint
+      #       port: http-caption # Reference the named port
+      #     initialDelaySeconds: 120 # May need adjustment based on model load time from cache
+      #     periodSeconds: 20
+      #     timeoutSeconds: 10
+      #     failureThreshold: 3
+      #   readinessProbe:
+      #     httpGet:
+      #       path: /api/health # CHANGE to your actual health check endpoint
+      #       port: http-caption # Reference the named port
+      #     initialDelaySeconds: 130 # Slightly after liveness, allow full startup
+      #     periodSeconds: 15
+      #     timeoutSeconds: 10
+      #     successThreshold: 1
+      #     failureThreshold: 3
+
+      # # --- Other Pod Spec configs ---
+      # # imagePullSecrets: # Uncomment if using a private registry
+      # # - name: your-registry-secret
+      # # nodeSelector: # Optional: schedule on specific nodes (e.g., with GPUs)
+      # #   accelerator: nvidia-gpu
+      # # tolerations: # Optional: allow scheduling on nodes with specific taints (e.g., GPU nodes)
+      # # - key: "nvidia.com/gpu"
+      # #   operator: "Exists"
+      # #   effect: "NoSchedule"

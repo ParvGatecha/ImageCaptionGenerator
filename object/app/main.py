@@ -2,7 +2,7 @@ import logging
 from fastapi import FastAPI, File, UploadFile, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from prometheus_fastapi_instrumentator import Instrumentator
+# from prometheus_fastapi_instrumentator import Instrumentator
 
 from . import model_loader, schemas # Use relative imports within the package
 
@@ -34,7 +34,7 @@ app = FastAPI(
     lifespan=lifespan # Use the lifespan context manager
 )
 
-Instrumentator().instrument(app).expose(app)
+# Instrumentator().instrument(app).expose(app)
 
 app.add_middleware(
     CORSMiddleware,

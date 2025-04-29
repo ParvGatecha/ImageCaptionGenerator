@@ -1,0 +1,12 @@
+# shared-model.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shared-model-cache-pvc # Name to reference in deployments
+  namespace: spe-project       # Same namespace as your deployments
+spec:
+  accessModes:
+    - ReadWriteMany # Or ReadOnlyMany if appropriate
+  resources:
+    requests:
+      storage: 10Gi # Request sufficient storage for models & cache (adjust size!)

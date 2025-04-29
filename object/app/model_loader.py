@@ -7,6 +7,9 @@ import cv2 # Import opencv
 
 # Import YOLO from ultralytics
 from ultralytics import YOLO
+import os # Import os module
+
+MODEL_PATH_ON_VOLUME = "/model-cache/yolo/yolo11m.pt"
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +21,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu" # ultralytics can often 
 CONFIDENCE_THRESHOLD = 0.40 # Adjust confidence threshold as needed for YOLOv8
 
 # --- Global Variables ---
-model = None
+model = None # Initialize model to None or a placeholder
 # image_processor is no longer needed from transformers
 
 # --- Initialization ---
@@ -31,7 +34,9 @@ def load_model():
     try:
         logger.info(f"Loading YOLOv11 model '{MODEL_NAME}' onto device '{DEVICE}'...")
         # Initialize YOLO model
-        model = YOLO(MODEL_NAME)
+        if not os.path.exists(MODEL_PATH_ON_VOLUME):
+               raise RuntimeError(f"Model file not found at {MODEL_PATH_ON_VOLUME}. Init container might have failed.")
+        model = YOLO(MODEL_PATH_ON_VOLUME)
         # You can explicitly move the model to a device if needed,
         # but YOLO often handles device placement automatically during predict.
         # model.to(DEVICE) # Usually not required unless specific device needed upfront
