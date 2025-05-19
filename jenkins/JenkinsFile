@@ -9,43 +9,35 @@ pipeline {
 
     environment {
         // --- Configuration ---
-        DOCKER_REGISTRY = 'docker.io/parvg' // e.g., 'docker.io/yourusername' or your private registry URL
+        DOCKER_REGISTRY = 'docker.io/parvg' // Your Docker Hub username
         DOCKER_CREDENTIALS_ID = 'docker-hub-credentials' // Jenkins Credentials ID for Docker registry
         KUBECONFIG_CREDENTIALS_ID = 'kube-config' // Jenkins Credentials ID for Kubeconfig
-        K8S_NAMESPACE = 'image-captioning'
-        BACKEND_IMAGE_NAME = "${DOCKER_REGISTRY}/image-caption-backend"
-        FRONTEND_IMAGE_NAME = "${DOCKER_REGISTRY}/image-caption-frontend"
-        // Use build number or git commit hash for image tags for traceability
-        IMAGE_TAG = "build-${BUILD_NUMBER}" // Or sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+        K8S_NAMESPACE = 'spe-project'
+        
+        // Image names
+        FRONTEND_IMAGE_NAME = "${DOCKER_REGISTRY}/spefrontend"
+        CAPTION_IMAGE_NAME = "${DOCKER_REGISTRY}/caption"
+        OBJECT_IMAGE_NAME = "${DOCKER_REGISTRY}/object"
+        
+        // Use build number for image tags
+        IMAGE_TAG = "build-${BUILD_NUMBER}"
+        
+        // Email configuration
+        EMAIL_RECIPIENTS = 'googloid111@gmail.com' // Replace with actual email
     }
 
     options {
-        buildDiscarder(logRotator(numToKeepStr: '10')) // Keep logs for last 10 builds
-        timestamps() // Add timestamps to console output
-        timeout(time: 1, unit: 'HOURS') // Overall build timeout
-        disableConcurrentBuilds() // Prevent concurrent builds for the same job
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timestamps()
+        timeout(time: 1, unit: 'HOURS')
+        disableConcurrentBuilds()
     }
 
     stages {
         stage('Checkout') {
             steps {
                 echo "Checking out source code..."
-                checkout scm // Assumes Jenkins job is configured with SCM (e.g., Git)
-            }
-        }
-
-        stage('Build Backend Image') {
-            steps {
-                script {
-                    echo "Building backend Docker image: ${BACKEND_IMAGE_NAME}:${IMAGE_TAG}"
-                    // Change directory to where the Dockerfile is located
-                    dir('backend') {
-                         // Use docker.build() from Docker Pipeline plugin
-                         def backendImage = docker.build("${BACKEND_IMAGE_NAME}:${IMAGE_TAG}", "--pull -f Dockerfile .") // --pull ensures base image is updated
-                         // Optional: Push latest tag as well
-                         // backendImage.push('latest')
-                    }
-                }
+                checkout scm
             }
         }
 
@@ -55,78 +47,94 @@ pipeline {
                     echo "Building frontend Docker image: ${FRONTEND_IMAGE_NAME}:${IMAGE_TAG}"
                     dir('frontend') {
                         def frontendImage = docker.build("${FRONTEND_IMAGE_NAME}:${IMAGE_TAG}", "--pull -f Dockerfile .")
-                        // Optional: Push latest tag as well
-                        // frontendImage.push('latest')
+                    }
+                }
+            }
+        }
+
+        stage('Build Caption Image') {
+            steps {
+                script {
+                    echo "Building caption Docker image: ${CAPTION_IMAGE_NAME}:${IMAGE_TAG}"
+                    dir('caption') {
+                        def captionImage = docker.build("${CAPTION_IMAGE_NAME}:${IMAGE_TAG}", "--pull -f Dockerfile .")
+                    }
+                }
+            }
+        }
+
+        stage('Build Object Detection Image') {
+            steps {
+                script {
+                    echo "Building object detection Docker image: ${OBJECT_IMAGE_NAME}:${IMAGE_TAG}"
+                    dir('object') {
+                        def objectImage = docker.build("${OBJECT_IMAGE_NAME}:${IMAGE_TAG}", "--pull -f Dockerfile .")
                     }
                 }
             }
         }
 
         stage('Push Images') {
-             // Requires Docker Credentials configured in Jenkins
             steps {
                 script {
                     echo "Pushing images to registry: ${DOCKER_REGISTRY}"
-                    docker.withRegistry("https://${DOCKER_REGISTRY}", DOCKER_CREDENTIALS_ID) { // Use https:// prefix for docker.io, adjust if needed for others
-                        echo "Pushing ${BACKEND_IMAGE_NAME}:${IMAGE_TAG}"
-                        docker.image("${BACKEND_IMAGE_NAME}:${IMAGE_TAG}").push()
-
+                    docker.withRegistry("https://${DOCKER_REGISTRY}", DOCKER_CREDENTIALS_ID) {
+                        // Push frontend image
                         echo "Pushing ${FRONTEND_IMAGE_NAME}:${IMAGE_TAG}"
                         docker.image("${FRONTEND_IMAGE_NAME}:${IMAGE_TAG}").push()
+                        docker.image("${FRONTEND_IMAGE_NAME}:${IMAGE_TAG}").push('latest')
 
-                        // Optional: Push 'latest' tag
-                         echo "Pushing latest tags..."
-                         docker.image("${BACKEND_IMAGE_NAME}:${IMAGE_TAG}").push('latest')
-                         docker.image("${FRONTEND_IMAGE_NAME}:${IMAGE_TAG}").push('latest')
+                        // Push caption image
+                        echo "Pushing ${CAPTION_IMAGE_NAME}:${IMAGE_TAG}"
+                        docker.image("${CAPTION_IMAGE_NAME}:${IMAGE_TAG}").push()
+                        docker.image("${CAPTION_IMAGE_NAME}:${IMAGE_TAG}").push('latest')
+
+                        // Push object detection image
+                        echo "Pushing ${OBJECT_IMAGE_NAME}:${IMAGE_TAG}"
+                        docker.image("${OBJECT_IMAGE_NAME}:${IMAGE_TAG}").push()
+                        docker.image("${OBJECT_IMAGE_NAME}:${IMAGE_TAG}").push('latest')
                     }
                 }
             }
         }
 
-        // stage('Run Tests') { // Optional testing stage
-        //     steps {
-        //         echo "Running backend tests..."
-        //         dir('backend') {
-        //             // Example: Run pytest inside the built container or directly if env matches
-        //             // sh 'docker run --rm ${BACKEND_IMAGE_NAME}:${IMAGE_TAG} pytest tests/'
-        //             // Or if dependencies are installed on agent:
-        //             // sh 'pip install -r requirements.txt && pytest'
-        //         }
-        //         // Add frontend tests if applicable (e.g., npm test)
-        //     }
-        // }
-
         stage('Deploy to Kubernetes') {
-            // Requires Kubernetes Credentials (kubeconfig) configured in Jenkins
             steps {
                 script {
                     echo "Deploying to Kubernetes namespace: ${K8S_NAMESPACE}"
-                    // Use Kubernetes CLI plugin (kubectl)
                     withKubeConfig([credentialsId: KUBECONFIG_CREDENTIALS_ID]) {
-                        // 1. Ensure Namespace Exists (optional, best practice)
+                        // 1. Create namespace if it doesn't exist
                         sh "kubectl apply -f kubernetes/namespace.yaml"
 
-                        // 2. Apply all standard manifests (Secrets, Services, Ingress, HPA first)
-                        //    Secrets should ideally be managed outside Git or encrypted (e.g., using Sealed Secrets or Vault)
-                        //    sh "kubectl apply -n ${K8S_NAMESPACE} -f kubernetes/secrets.yaml" # If applicable
-                        sh "kubectl apply -n ${K8S_NAMESPACE} -f kubernetes/backend-service.yaml"
-                        sh "kubectl apply -n ${K8S_NAMESPACE} -f kubernetes/frontend-service.yaml"
-                        sh "kubectl apply -n ${K8S_NAMESPACE} -f kubernetes/ingress.yaml"
-                        sh "kubectl apply -n ${K8S_NAMESPACE} -f kubernetes/hpa.yaml"
+                        // 2. Apply shared model PVC
+                        sh "kubectl apply -f kubernetes/shared-model.yaml"
 
-                        // 3. Update Deployments: Use kubectl set image or kustomize/helm for better rollout control
-                        //    Using 'kubectl set image' triggers a rolling update
-                        echo "Updating backend deployment image to ${BACKEND_IMAGE_NAME}:${IMAGE_TAG}"
-                        sh "kubectl set image deployment/backend-deployment backend=${BACKEND_IMAGE_NAME}:${IMAGE_TAG} -n ${K8S_NAMESPACE} --record"
+                        // 3. Apply services
+                        sh "kubectl apply -f kubernetes/frontend-service.yaml"
+                        sh "kubectl apply -f kubernetes/backend-service.yaml"
+                        sh "kubectl apply -f kubernetes/object-detector-service.yaml"
 
-                        echo "Updating frontend deployment image to ${FRONTEND_IMAGE_NAME}:${IMAGE_TAG}"
-                        sh "kubectl set image deployment/frontend-deployment frontend=${FRONTEND_IMAGE_NAME}:${IMAGE_TAG} -n ${K8S_NAMESPACE} --record"
+                        // 4. Apply ingress
+                        sh "kubectl apply -f kubernetes/ingress.yaml"
 
-                        // Optional: Wait for rollout to complete
-                        echo "Waiting for backend rollout to complete..."
-                        sh "kubectl rollout status deployment/backend-deployment -n ${K8S_NAMESPACE} --timeout=5m"
-                        echo "Waiting for frontend rollout to complete..."
-                        sh "kubectl rollout status deployment/frontend-deployment -n ${K8S_NAMESPACE} --timeout=2m"
+                        // 5. Apply monitoring
+                        sh "kubectl apply -f kubernetes/app-servicemonitors.yaml"
+                        sh "kubectl apply -f kubernetes/grafana-ingress.yaml"
+                        sh "kubectl apply -f kubernetes/grafana-values.yaml"
+
+                        // 6. Update deployments with new images
+                        sh """
+                            kubectl set image deployment/frontend-deployment frontend=${FRONTEND_IMAGE_NAME}:${IMAGE_TAG} -n ${K8S_NAMESPACE} --record
+                            kubectl set image deployment/backend-deployment backend=${CAPTION_IMAGE_NAME}:${IMAGE_TAG} -n ${K8S_NAMESPACE} --record
+                            kubectl set image deployment/object-detector-deployment object-detector=${OBJECT_IMAGE_NAME}:${IMAGE_TAG} -n ${K8S_NAMESPACE} --record
+                        """
+
+                        // 7. Wait for rollouts to complete
+                        sh """
+                            kubectl rollout status deployment/frontend-deployment -n ${K8S_NAMESPACE} --timeout=5m
+                            kubectl rollout status deployment/backend-deployment -n ${K8S_NAMESPACE} --timeout=5m
+                            kubectl rollout status deployment/object-detector-deployment -n ${K8S_NAMESPACE} --timeout=5m
+                        """
                     }
                 }
             }
@@ -136,16 +144,42 @@ pipeline {
     post {
         always {
             echo 'Pipeline finished.'
-            // Clean up workspace, send notifications, etc.
             cleanWs()
         }
         success {
             echo 'Pipeline succeeded!'
-            // Send success notification (e.g., Slack, Email)
+            emailext (
+                subject: "Pipeline Successful: ${env.JOB_NAME} [${env.BUILD_NUMBER}]",
+                body: """
+                    Pipeline ${env.JOB_NAME} build #${env.BUILD_NUMBER} was successful!
+                    
+                    Build URL: ${env.BUILD_URL}
+                    Workspace: ${env.WORKSPACE}
+                    
+                    Deployed Images:
+                    - Frontend: ${FRONTEND_IMAGE_NAME}:${IMAGE_TAG}
+                    - Caption: ${CAPTION_IMAGE_NAME}:${IMAGE_TAG}
+                    - Object Detection: ${OBJECT_IMAGE_NAME}:${IMAGE_TAG}
+                    
+                    Kubernetes Namespace: ${K8S_NAMESPACE}
+                """,
+                to: "${EMAIL_RECIPIENTS}"
+            )
         }
         failure {
             echo 'Pipeline failed!'
-            // Send failure notification
+            emailext (
+                subject: "Pipeline Failed: ${env.JOB_NAME} [${env.BUILD_NUMBER}]",
+                body: """
+                    Pipeline ${env.JOB_NAME} build #${env.BUILD_NUMBER} failed!
+                    
+                    Build URL: ${env.BUILD_URL}
+                    Workspace: ${env.WORKSPACE}
+                    
+                    Please check the Jenkins console output for more details.
+                """,
+                to: "${EMAIL_RECIPIENTS}"
+            )
         }
     }
 }

@@ -1,6 +1,14 @@
-# grafana-values.yaml
+# monitoring-values.yaml
 grafana:
+  # Persistence for Grafana data (dashboards, users, etc.)
+  persistence:
+    enabled: true
+    # Optional: Specify storage class if needed, otherwise uses default
+    # storageClassName: your-grafana-storage-class
+    size: 5Gi # Adjust size as needed
   # Tell Grafana its public root URL via environment variable
-  # *** IMPORTANT: Include the trailing slash! ***
+  # *** IMPORTANT: Include the protocol (http or https) and the trailing slash! ***
   env:
     GF_SERVER_ROOT_URL: http://ai-tools/grafana/
+  # Optional: Configure admin user password (if you don't want the auto-generated one)
+  # adminPassword: your-secure-password
