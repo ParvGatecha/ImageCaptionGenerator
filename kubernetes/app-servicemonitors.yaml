@@ -19,6 +19,10 @@ spec:
     interval: 15s
     scrapeTimeout: 10s
     honorLabels: true
+    metricRelabelings:
+      - sourceLabels: [__name__]
+        regex: 'fastapi_.*'
+        action: keep
     relabelings:
       - sourceLabels: [__meta_kubernetes_pod_label_app]
         targetLabel: app
@@ -44,6 +48,10 @@ spec:
     interval: 15s
     scrapeTimeout: 10s
     honorLabels: true
+    metricRelabelings:
+      - sourceLabels: [__name__]
+        regex: 'fastapi_.*'
+        action: keep
     relabelings:
       - sourceLabels: [__meta_kubernetes_pod_label_app]
         targetLabel: app

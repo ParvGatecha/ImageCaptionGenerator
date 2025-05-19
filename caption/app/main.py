@@ -61,7 +61,12 @@ instrumentator.add(
 )
 
 # Instrument the app and expose metrics at root path
-instrumentator.instrument(app).expose(app, include_in_schema=False, should_gzip=True)
+instrumentator.instrument(app).expose(app, include_in_schema=True, should_gzip=True)
+
+# Add a metrics endpoint explicitly
+@app.get("/metrics", include_in_schema=False)
+async def metrics():
+    return instrumentator.metrics()
 
 app.add_middleware(
     CORSMiddleware,
