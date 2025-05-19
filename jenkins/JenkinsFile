@@ -1,10 +1,7 @@
-// Ensure you have Docker, kubectl, and necessary plugins (Docker Pipeline, Kubernetes CLI, etc.) installed on Jenkins agents
-// Configure Credentials in Jenkins for Docker Registry (e.g., 'dockerhub-credentials') and Kubernetes (e.g., 'kubeconfig-credentials')
 
 pipeline {
     agent {
-        // Use an agent with Docker and kubectl capabilities
-        any // Or use specific agent node name/label
+        any
     }
 
     environment {
