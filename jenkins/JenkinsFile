@@ -1,24 +1,24 @@
-
 pipeline {
     agent any
 
     environment {
         // --- Configuration ---
-        DOCKER_REGISTRY = 'docker.io/parvg' // Your Docker Hub username
-        DOCKER_CREDENTIALS_ID = 'docker-hub-credentials' // Jenkins Credentials ID for Docker registry
-        KUBECONFIG_CREDENTIALS_ID = 'kube-config' // Jenkins Credentials ID for Kubeconfig
+        DOCKER_REGISTRY = 'docker.io'
+        DOCKER_USERNAME = 'parvg'
+        DOCKER_CREDENTIALS_ID = 'docker-hub-credentials'
+        KUBECONFIG_CREDENTIALS_ID = 'kube-config'
         K8S_NAMESPACE = 'spe-project'
         
         // Image names
-        FRONTEND_IMAGE_NAME = "${DOCKER_REGISTRY}/spefrontend"
-        CAPTION_IMAGE_NAME = "${DOCKER_REGISTRY}/caption"
-        OBJECT_IMAGE_NAME = "${DOCKER_REGISTRY}/object"
+        FRONTEND_IMAGE_NAME = "${DOCKER_USERNAME}/spefrontend"
+        CAPTION_IMAGE_NAME = "${DOCKER_USERNAME}/caption"
+        OBJECT_IMAGE_NAME = "${DOCKER_USERNAME}/object"
         
         // Use build number for image tags
         IMAGE_TAG = "build-${BUILD_NUMBER}"
         
         // Email configuration
-        EMAIL_RECIPIENTS = 'googloid111@gmail.com' // Replace with actual email
+        EMAIL_RECIPIENTS = 'googloid111@gmail.com'
     }
 
     options {
@@ -36,12 +36,27 @@ pipeline {
             }
         }
 
+        stage('Docker Login') {
+            steps {
+                script {
+                    // Use withCredentials to securely handle Docker login
+                    withCredentials([usernamePassword(credentialsId: DOCKER_CREDENTIALS_ID, 
+                                                    usernameVariable: 'DOCKER_USER', 
+                                                    passwordVariable: 'DOCKER_PASS')]) {
+                        sh '''
+                            echo $DOCKER_PASS | docker login ${DOCKER_REGISTRY} -u $DOCKER_USER --password-stdin
+                        '''
+                    }
+                }
+            }
+        }
+
         stage('Build Frontend Image') {
             steps {
                 script {
                     echo "Building frontend Docker image: ${FRONTEND_IMAGE_NAME}:${IMAGE_TAG}"
                     dir('frontend') {
-                        def frontendImage = docker.build("${FRONTEND_IMAGE_NAME}:${IMAGE_TAG}", "--pull -f Dockerfile .")
+                        sh "docker build -t ${FRONTEND_IMAGE_NAME}:${IMAGE_TAG} -f Dockerfile ."
                     }
                 }
             }
@@ -52,7 +67,7 @@ pipeline {
                 script {
                     echo "Building caption Docker image: ${CAPTION_IMAGE_NAME}:${IMAGE_TAG}"
                     dir('caption') {
-                        def captionImage = docker.build("${CAPTION_IMAGE_NAME}:${IMAGE_TAG}", "--pull -f Dockerfile .")
+                        sh "docker build -t ${CAPTION_IMAGE_NAME}:${IMAGE_TAG} -f Dockerfile ."
                     }
                 }
             }
@@ -63,7 +78,7 @@ pipeline {
                 script {
                     echo "Building object detection Docker image: ${OBJECT_IMAGE_NAME}:${IMAGE_TAG}"
                     dir('object') {
-                        def objectImage = docker.build("${OBJECT_IMAGE_NAME}:${IMAGE_TAG}", "--pull -f Dockerfile .")
+                        sh "docker build -t ${OBJECT_IMAGE_NAME}:${IMAGE_TAG} -f Dockerfile ."
                     }
                 }
             }
@@ -73,22 +88,17 @@ pipeline {
             steps {
                 script {
                     echo "Pushing images to registry: ${DOCKER_REGISTRY}"
-                    docker.withRegistry("https://${DOCKER_REGISTRY}", DOCKER_CREDENTIALS_ID) {
-                        // Push frontend image
-                        echo "Pushing ${FRONTEND_IMAGE_NAME}:${IMAGE_TAG}"
-                        docker.image("${FRONTEND_IMAGE_NAME}:${IMAGE_TAG}").push()
-                        docker.image("${FRONTEND_IMAGE_NAME}:${IMAGE_TAG}").push('latest')
+                    // Push frontend image
+                    sh "docker push ${FRONTEND_IMAGE_NAME}:${IMAGE_TAG}"
+                    sh "docker push ${FRONTEND_IMAGE_NAME}:latest"
 
-                        // Push caption image
-                        echo "Pushing ${CAPTION_IMAGE_NAME}:${IMAGE_TAG}"
-                        docker.image("${CAPTION_IMAGE_NAME}:${IMAGE_TAG}").push()
-                        docker.image("${CAPTION_IMAGE_NAME}:${IMAGE_TAG}").push('latest')
+                    // Push caption image
+                    sh "docker push ${CAPTION_IMAGE_NAME}:${IMAGE_TAG}"
+                    sh "docker push ${CAPTION_IMAGE_NAME}:latest"
 
-                        // Push object detection image
-                        echo "Pushing ${OBJECT_IMAGE_NAME}:${IMAGE_TAG}"
-                        docker.image("${OBJECT_IMAGE_NAME}:${IMAGE_TAG}").push()
-                        docker.image("${OBJECT_IMAGE_NAME}:${IMAGE_TAG}").push('latest')
-                    }
+                    // Push object detection image
+                    sh "docker push ${OBJECT_IMAGE_NAME}:${IMAGE_TAG}"
+                    sh "docker push ${OBJECT_IMAGE_NAME}:latest"
                 }
             }
         }
