@@ -39,7 +39,29 @@ app = FastAPI(
     lifespan=lifespan               # Tells FastAPI to prefix paths *within* the schema
 )
 
-Instrumentator().instrument(app).expose(app)
+# Configure Prometheus metrics with more detailed instrumentation
+instrumentator = Instrumentator(
+    should_group_status_codes=False,
+    should_ignore_untemplated=True,
+    should_respect_env_var=True,
+    should_instrument_requests_inprogress=True,
+    excluded_handlers=["/metrics"],
+    env_var_name="ENABLE_METRICS",
+    inprogress_name="fastapi_inprogress",
+    inprogress_labels=True,
+)
+
+# Add more detailed metrics
+instrumentator.add(
+    prometheus_multiproc_dir=".",
+    default_labels={
+        "app": "caption-service",
+        "version": "1.0.0"
+    }
+)
+
+# Instrument the app and expose metrics at root path
+instrumentator.instrument(app).expose(app, include_in_schema=False, should_gzip=True)
 
 app.add_middleware(
     CORSMiddleware,
