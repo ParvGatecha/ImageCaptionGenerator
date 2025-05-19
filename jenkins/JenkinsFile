@@ -110,7 +110,7 @@ pipeline {
                     
                     // Copy Docker Desktop Kubernetes config
                     sh '''
-                        # For Windows, the config is typically in %USERPROFILE%\.kube\config
+                        # For Windows, use forward slashes in paths
                         if [ -f "$USERPROFILE/.kube/config" ]; then
                             cp "$USERPROFILE/.kube/config" "$HOME/.kube/config"
                         else
