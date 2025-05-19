@@ -5,17 +5,27 @@ metadata:
   namespace: spe-project # MUST be the same namespace as the Service
   labels:
     release: prometheus # MUST match the label Prometheus uses to find monitors (default for the chart)
+    app: image-caption-backend
 spec:
   selector:
     matchLabels:
-      app: image-caption-backend # Selects the backend-service via its label
+      app: image-caption-backend
   namespaceSelector: # Optional, but good practice
     matchNames:
       - spe-project
   endpoints:
   - port: http-caption # Matches the NAME of the port in backend-service
     path: /metrics     # Path where metrics are exposed by your app
-    interval: 30s      # How often to scrape
+    interval: 15s
+    scrapeTimeout: 10s
+    honorLabels: true
+    metricRelabelings:
+      - sourceLabels: [__name__]
+        regex: 'fastapi_.*'
+        action: keep
+    relabelings:
+      - sourceLabels: [__meta_kubernetes_pod_label_app]
+        targetLabel: app
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
@@ -24,14 +34,24 @@ metadata:
   namespace: spe-project # MUST be the same namespace as the Service
   labels:
     release: prometheus # MUST match the label Prometheus uses to find monitors
+    app: object-detector-backend
 spec:
   selector:
     matchLabels:
-      app: object-detector-backend # Selects the object-detector-service via its label
+      app: object-detector-backend
   namespaceSelector:
     matchNames:
       - spe-project
   endpoints:
   - port: http-object # Matches the NAME of the port in object-detector-service
     path: /metrics    # Path where metrics are exposed by your app
-    interval: 30s
+    interval: 15s
+    scrapeTimeout: 10s
+    honorLabels: true
+    metricRelabelings:
+      - sourceLabels: [__name__]
+        regex: 'fastapi_.*'
+        action: keep
+    relabelings:
+      - sourceLabels: [__meta_kubernetes_pod_label_app]
+        targetLabel: app

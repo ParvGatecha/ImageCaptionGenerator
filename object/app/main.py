@@ -27,14 +27,44 @@ async def lifespan(app: FastAPI):
 
 
 # --- FastAPI App Initialization ---
+API_PREFIX = "/api"
+
 app = FastAPI(
     title="Object Detection API",
     description="API to detect objects in uploaded images.",
-    version="0.1.0",
-    lifespan=lifespan # Use the lifespan context manager
+    openapi_url=f"{API_PREFIX}/openapi.json",
+    openapi_prefix=API_PREFIX,
+    lifespan=lifespan
 )
 
-Instrumentator().instrument(app).expose(app)
+# Configure Prometheus metrics with more detailed instrumentation
+instrumentator = Instrumentator(
+    should_group_status_codes=False,
+    should_ignore_untemplated=True,
+    should_respect_env_var=True,
+    should_instrument_requests_inprogress=True,
+    excluded_handlers=["/metrics"],
+    env_var_name="ENABLE_METRICS",
+    inprogress_name="fastapi_inprogress",
+    inprogress_labels=True,
+)
+
+# Add more detailed metrics
+instrumentator.add(
+    prometheus_multiproc_dir=".",
+    default_labels={
+        "app": "object-detection-service",
+        "version": "1.0.0"
+    }
+)
+
+# Instrument the app and expose metrics at root path
+instrumentator.instrument(app).expose(app, include_in_schema=True, should_gzip=True)
+
+# Add a metrics endpoint explicitly
+@app.get("/metrics", include_in_schema=False)
+async def metrics():
+    return instrumentator.metrics()
 
 app.add_middleware(
     CORSMiddleware,
