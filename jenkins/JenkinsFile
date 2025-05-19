@@ -39,7 +39,6 @@ pipeline {
         stage('Docker Login') {
             steps {
                 script {
-                    // Use withCredentials to securely handle Docker login
                     withCredentials([usernamePassword(credentialsId: DOCKER_CREDENTIALS_ID, 
                                                     usernameVariable: 'DOCKER_USER', 
                                                     passwordVariable: 'DOCKER_PASS')]) {
@@ -103,11 +102,39 @@ pipeline {
             }
         }
 
+        stage('Setup Kubernetes') {
+            steps {
+                script {
+                    // Create .kube directory if it doesn't exist
+                    sh 'mkdir -p $HOME/.kube'
+                    
+                    // Copy Docker Desktop Kubernetes config
+                    sh '''
+                        # For Windows, the config is typically in %USERPROFILE%\.kube\config
+                        if [ -f "$USERPROFILE/.kube/config" ]; then
+                            cp "$USERPROFILE/.kube/config" "$HOME/.kube/config"
+                        else
+                            echo "Error: Docker Desktop Kubernetes config not found"
+                            exit 1
+                        fi
+                        
+                        # Set proper permissions
+                        chmod 600 "$HOME/.kube/config"
+                        
+                        # Verify kubectl can access the cluster
+                        kubectl config use-context docker-desktop
+                        kubectl cluster-info
+                    '''
+                }
+            }
+        }
+
         stage('Deploy to Kubernetes') {
             steps {
                 script {
                     echo "Deploying to Kubernetes namespace: ${K8S_NAMESPACE}"
-                    withKubeConfig([credentialsId: KUBECONFIG_CREDENTIALS_ID]) {
+                    
+                    try {
                         // 1. Create namespace if it doesn't exist
                         sh "kubectl apply -f kubernetes/namespace.yaml"
 
@@ -140,6 +167,11 @@ pipeline {
                             kubectl rollout status deployment/backend-deployment -n ${K8S_NAMESPACE} --timeout=5m
                             kubectl rollout status deployment/object-detector-deployment -n ${K8S_NAMESPACE} --timeout=5m
                         """
+                    } catch (Exception e) {
+                        echo "Error during Kubernetes deployment: ${e.message}"
+                        sh 'kubectl get pods -n ${K8S_NAMESPACE}'
+                        sh 'kubectl describe pods -n ${K8S_NAMESPACE}'
+                        throw e
                     }
                 }
             }
