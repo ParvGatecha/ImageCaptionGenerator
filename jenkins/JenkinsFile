@@ -105,21 +105,10 @@ pipeline {
         stage('Setup Kubernetes') {
             steps {
                 script {
-                    // Create .kube directory if it doesn't exist
-                    sh 'mkdir -p $HOME/.kube'
-                    
-                    // Copy Docker Desktop Kubernetes config
+                    // Set KUBECONFIG environment variable to use Docker Desktop's config
                     sh '''
-                        # For Windows, use forward slashes in paths
-                        if [ -f "$USERPROFILE/.kube/config" ]; then
-                            cp "$USERPROFILE/.kube/config" "$HOME/.kube/config"
-                        else
-                            echo "Error: Docker Desktop Kubernetes config not found"
-                            exit 1
-                        fi
-                        
-                        # Set proper permissions
-                        chmod 600 "$HOME/.kube/config"
+                        # Set KUBECONFIG to use Docker Desktop's config
+                        export KUBECONFIG="$USERPROFILE/.kube/config"
                         
                         # Verify kubectl can access the cluster
                         kubectl config use-context docker-desktop
