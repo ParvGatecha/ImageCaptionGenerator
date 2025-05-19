@@ -141,6 +141,7 @@ pipeline {
                         // 5. Apply monitoring
                         sh "kubectl apply -f kubernetes/app-servicemonitors.yaml"
                         sh "kubectl apply -f kubernetes/grafana-ingress.yaml"
+                        sh "kubectl apply -f kubernetes/grafana-values.yaml"
 
                         // 6. Update deployments with new images
                         sh """
