@@ -137,6 +137,7 @@ pipeline {
 
                         // 4. Apply ingress
                         sh "kubectl apply -f kubernetes/ingress.yaml"
+                        sh "kubectl apply -f kubernetes/hpa.yaml"
 
                         // 5. Apply monitoring
                         sh "kubectl apply -f kubernetes/app-servicemonitors.yaml"
